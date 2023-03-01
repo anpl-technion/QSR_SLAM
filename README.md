@@ -48,7 +48,7 @@ Install python 3.10 or later
 make python env using requierments.txt
 
 
-## 4) Instalation
+## 4) Usage
 
 ---
 
