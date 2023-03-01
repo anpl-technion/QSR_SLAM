@@ -1,7 +1,7 @@
 # Technion ANPL QSR-SLAM
 
 
-Authors: Roee Mor.
+Authors: Roee Mor. 
 
 QSR-SLAM is the first open-source qualitative geometry SLAM library.
 
