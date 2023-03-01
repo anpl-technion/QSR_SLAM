@@ -1,4 +1,5 @@
 import numpy as np
+import common
 
 
 class Scenario:
@@ -13,14 +14,22 @@ class Scenario:
         self.azimuth_measurement_noise_std = azimuth_measurement_noise_std * np.pi/180  # azimuth measurement noise std
         self.motion_model_noise_std = motion_model_noise_std * np.pi/180  # motion model noise std
 
-        self.landmark_ids = np.zeros((1, 0))
-        self.landmark_positions = np.zeros((0, 2))  # [x,y]
+        max_num_view_to_landmark = 1000
+        view_to_landmark_data_size = 1  # [azimuth]
+        max_num_view_to_view = 100
+        view_to_view_data_size = 1  # [heading]
+        self.landmark_view_set = common.landmark_view_set.LandmarkViewSet(max_num_view_to_landmark,
+                                                                     view_to_landmark_data_size,
+                                                                     max_num_view_to_view, view_to_view_data_size)
 
-        self.view_ids = np.zeros((1, 0))
-        self.view_poses = np.zeros((0, 2))  # [x,y,azimuth]
-
-        self.view_to_landmark_observations = np.zeros((0, 4))  # [view_id, landmark_id, azimuth_gt, azimuth_measured]
-        self.view_to_view_motion_model = np.zeros((0, 4))  # [view_id1, view_id2, heading_gt, heading_measured]
+        # self.landmark_ids = np.zeros((1, 0))
+        # self.landmark_positions = np.zeros((0, 2))  # [x,y]
+        #
+        # self.view_ids = np.zeros((1, 0))
+        # self.view_poses = np.zeros((0, 2))  # [x,y,azimuth]
+        #
+        # self.view_to_landmark_observations = np.zeros((0, 4))  # [view_id, landmark_id, azimuth_gt, azimuth_measured]
+        # self.view_to_view_motion_model = np.zeros((0, 4))  # [view_id1, view_id2, heading_gt, heading_measured]
 
     def add_landmark(self, num_landmarks, landmark_ids=None, landmark_positions=None):
         """
