@@ -7,9 +7,9 @@ class Scenario:
     2D map with landmarks
     """
     def __init__(self, rmin, xlim, ylim, azimuth_measurement_noise_std, motion_model_noise_std):
-        self.xlim = xlim  # map limits [xmin,xmax]
-        self.ylim = ylim  # map limits [ymin,ymax]
-        self.rmin = rmin  # minimum distance between objects(landmarks and cameras)
+        self.map_limits_x = xlim  # map limits [xmin,xmax]
+        self.map_limits_y = ylim  # map limits [ymin,ymax]
+        self.min_range_between_objects = rmin  # minimum distance between objects(landmarks and cameras)
 
         self.azimuth_measurement_noise_std = azimuth_measurement_noise_std * np.pi/180  # azimuth measurement noise std
         self.motion_model_noise_std = motion_model_noise_std * np.pi/180  # motion model noise std
@@ -21,19 +21,12 @@ class Scenario:
         self.landmark_view_set = common.landmark_view_set.LandmarkViewSet(max_num_view_to_landmark,
                                                                      view_to_landmark_data_size,
                                                                      max_num_view_to_view, view_to_view_data_size)
+        self.number_of_landmarks = 0
+        self.number_of_views = 0
 
-        # self.landmark_ids = np.zeros((1, 0))
-        # self.landmark_positions = np.zeros((0, 2))  # [x,y]
-        #
-        # self.view_ids = np.zeros((1, 0))
-        # self.view_poses = np.zeros((0, 2))  # [x,y,azimuth]
-        #
-        # self.view_to_landmark_observations = np.zeros((0, 4))  # [view_id, landmark_id, azimuth_gt, azimuth_measured]
-        # self.view_to_view_motion_model = np.zeros((0, 4))  # [view_id1, view_id2, heading_gt, heading_measured]
-
-    def add_landmark(self, num_landmarks, landmark_ids=None, landmark_positions=None):
+    def add_landmarks(self, num_landmarks, landmark_ids=None, landmark_positions=None):
         """
-        add landmarks to map:
+        manually add landmarks to map:
         num_landmarks - number of landmarks to add
         landmark_ids - landmark ids [nx1]
                        if None landmark ids in ascending order
@@ -45,56 +38,23 @@ class Scenario:
             Exception('invalid input!')
 
         if landmark_ids is None:
-            if self.landmark_ids.shape[0] == 0:
-                max_id = -1
-            else:
-                max_id = max(self.landmark_ids)
-            landmark_ids = np.array(range(max_id + 1, max_id + 1 + num_landmarks))
-        self.landmark_ids = np.hstack((self.landmark_ids, landmark_ids))
+            landmark_ids = np.array(range(self.number_of_landmarks, self.number_of_landmarks+num_landmarks))
 
         if landmark_positions is None:
             landmark_positions = self._generate_random_positions(num_landmarks)
-        self.landmark_positions = np.vstack((np.array(self.landmark_positions), np.array(landmark_positions)))
+        else:
+
+            if landmark_positions.shape != ():
+                max_id = -1
+            else:
+                max_id = max(self.landmark_ids)
+
+        self.landmark_view_set.add_landmark(num_landmarks, landmark_ids=landmark_ids, landmark_positions=landmark_positions)
+        self.number_of_landmarks = self.number_of_landmarks + num_landmarks
 
         return
 
-    def get_landmark(self, landmark_ids):
-        """
-        get landmarks location
-        landmark_ids - landmark ids [nx1]
-        """
-        landmark_positions = np.nan((landmark_ids.shape[0], 3))
-        is_valid = np.array((landmark_ids.shape[0], 3), dtype=np.bool)
-
-        for i, lid in enumerate(landmark_ids):
-            if lid in self.landmark_ids:
-                idx = np.argwhere(self.landmark_ids == lid)
-                landmark_positions[i, :] = self.landmark_positions[idx, :]
-                is_valid[i] = True
-            else:
-                is_valid[i] = False
-
-        return landmark_positions, is_valid
-
-    def remove_landmark(self, landmark_ids):
-        """
-        remove landmarks from map:
-        landmark_ids - landmark ids [nx1]
-        """
-        # TODO: remove corresponding measurements
-        is_valid = np.array((landmark_ids.shape[0], 3), dtype=np.bool)
-        for i, lid in enumerate(landmark_ids):
-            if lid in self.landmark_ids:
-                idx = np.argwhere(self.landmark_ids != lid)
-                self.landmark_positions = self.landmark_positions[idx, :]
-                self.landmark_ids = self.landmark_ids[idx]
-                is_valid[i] = True
-            else:
-                is_valid[i] = False
-
-        return is_valid
-
-    def add_view(self, num_views, view_ids=None, view_poses=None):
+    def add_views(self, num_views, view_ids=None, view_poses=None):
         """
         add camera view to trajectory:
         num_views - number of landmarks to add
@@ -120,42 +80,6 @@ class Scenario:
         self.view_poses = np.vstack((np.array(self.view_poses), np.array(view_poses)))
 
         return
-
-    def get_view(self, view_ids):
-        """
-        get view poses
-        view_ids - view ids [nx1]
-        """
-        view_poses = np.nan((view_ids.shape[0], 3))
-        is_valid = np.array((view_ids.shape[0], 3), dtype=np.bool)
-
-        for i, lid in enumerate(view_ids):
-            if lid in self.view_ids:
-                idx = np.argwhere(self.view_ids == lid)
-                view_poses[i, :] = self.view_poses[idx, :]
-                is_valid[i] = True
-            else:
-                is_valid[i] = False
-
-        return view_poses, is_valid
-
-    def remove_view(self, view_ids):
-        """
-        remove view from trajectory:
-        view_ids - view ids [nx1]
-        """
-        # TODO: remove corresponding measurements
-        is_valid = np.array((view_ids.shape[0], 3), dtype=np.bool)
-        for i, lid in enumerate(view_ids):
-            if lid in self.view_ids:
-                idx = np.argwhere(self.view_ids != lid)
-                self.view_poses = self.view_poses[idx, :]
-                self.view_ids = self.view_ids[idx]
-                is_valid[i] = True
-            else:
-                is_valid[i] = False
-
-        return is_valid
 
     def add_view_to_landmark_observations(self, view_id, landmark_id, measurement_std):
         """
@@ -184,9 +108,9 @@ class Scenario:
 
         return is_valid
 
-    def get_view_to_landmark_observations(self, view_id, landmark_id):
+    def add_view_to_view_observations(self, view_id1, view_id2, measurement_std):
         """
-        get view to landmark observation:
+        add view to landmark observation:
         view_id - view ids [nx1]
         landmark_id - landmark ids [nx1]
         """
@@ -197,21 +121,19 @@ class Scenario:
         is_valid = np.array((n, 3), dtype=np.bool)
         for i, vid in enumerate(view_id):
             if vid in self.view_ids and landmark_id[i] in self.landmark_ids:
-                idx = np.argwhere((vid, landmark_id[i]) == self.view_to_landmark_observations(:, 2: 3))
+                [view_pose, is_valid_i] = self.get_view(vid)
+                [landmark_position, is_valid_i] = self.get_landmark(landmark_id[i])
+
+                az_gt = np.arctan2(landmark_position[1] - view_pose[1], landmark_position[0] - view_pose[0]) - view_pose[2]
+                az = az_gt + (np.random.randn(1, 1) * measurement_std)
+                v2t = np.array([vid, landmark_id[i], az_gt, az])
+
+                self.view_to_landmark_observations = np.vstack(self.view_to_landmark_observations, v2t)
                 is_valid[i] = True
             else:
                 is_valid[i] = False
 
-        return observation, is_valid
-
-    def remove_view_to_landmark_observations(self, view_id1, view_id2, heading):
-        """
-        add poses to trajectory:
-        num_poses - number of poses to add
-        num_poses - camera position and orientation [nx3]
-                       if None, randomly sampled
-        """
-        pass
+        return is_valid
 
     def _generate_random_positions(self, num_landmarks):
         """
@@ -263,7 +185,7 @@ class Scenario:
         """
         pass
 
-    def plot_observations(self, color=None):
+    def plot_view_to_landmark_observations(self, color=None):
         """
         plot landmarks
         """
