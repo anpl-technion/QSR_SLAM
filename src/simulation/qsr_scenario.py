@@ -1,5 +1,6 @@
 import numpy as np
 import common
+import matplotlib.pyplot as plt
 
 
 class Scenario:
@@ -21,8 +22,6 @@ class Scenario:
         self.landmark_view_set = common.landmark_view_set.LandmarkViewSet(max_num_view_to_landmark,
                                                                      view_to_landmark_data_size,
                                                                      max_num_view_to_view, view_to_view_data_size)
-        self.number_of_landmarks = 0
-        self.number_of_views = 0
 
     def add_landmarks(self, num_landmarks, landmark_ids=None, landmark_positions=None):
         """
@@ -38,19 +37,13 @@ class Scenario:
             Exception('invalid input!')
 
         if landmark_ids is None:
-            landmark_ids = np.array(range(self.number_of_landmarks, self.number_of_landmarks+num_landmarks))
+            max_landmark_id = self.landmark_view_set.get_max_landmark_id
+            landmark_ids = range(max_landmark_id, max_landmark_id + num_landmarks)
 
         if landmark_positions is None:
             landmark_positions = self._generate_random_positions(num_landmarks)
-        else:
-
-            if landmark_positions.shape != ():
-                max_id = -1
-            else:
-                max_id = max(self.landmark_ids)
 
         self.landmark_view_set.add_landmark(num_landmarks, landmark_ids=landmark_ids, landmark_positions=landmark_positions)
-        self.number_of_landmarks = self.number_of_landmarks + num_landmarks
 
         return
 
@@ -67,46 +60,26 @@ class Scenario:
         if (num_views is None) or num_views < 1:
             Exception('invalid input!')
 
-        if num_views is None:
-            if self.view_ids.shape[0] == 0:
-                max_id = -1
-            else:
-                max_id = max(self.view_ids)
-            view_ids = np.array(range(max_id + 1, max_id + 1 + num_views))
-        self.view_ids = np.hstack((self.view_ids, view_ids))
+        if view_ids is None:
+            max_view_id = self.landmark_view_set.get_max_view_id
+            view_ids = range(max_view_id, max_view_id + num_views)
 
-        if num_views is None:
-            view_poses = self._generate_random_positions(num_views)
-        self.view_poses = np.vstack((np.array(self.view_poses), np.array(view_poses)))
+        if view_poses is None:
+            view_poses = self._generate_random_poses(num_views)
+
+        self.landmark_view_set.add_view(num_views, view_ids=view_ids, view_poses=view_poses)
 
         return
 
-    def add_view_to_landmark_observations(self, view_id, landmark_id, measurement_std):
+    def add_view_to_landmark_observations(self, view_id, landmark_id):
         """
         add view to landmark observation:
         view_id - view ids [nx1]
         landmark_id - landmark ids [nx1]
         """
-        n = view_id.shape[0]
-        if (view_id.shape is not (n, 1)) or (landmark_id.shape is not (n, 1)):
-            Exception('invalid input!')
+        self.landmark_view_set.get_view_to_landmark_observations(view_ids=view_id, landmark_ids=landmark_id)
 
-        is_valid = np.array((n, 3), dtype=np.bool)
-        for i, vid in enumerate(view_id):
-            if vid in self.view_ids and landmark_id[i] in self.landmark_ids:
-                [view_pose, is_valid_i] = self.get_view(vid)
-                [landmark_position, is_valid_i] = self.get_landmark(landmark_id[i])
-
-                az_gt = np.arctan2(landmark_position[1] - view_pose[1], landmark_position[0] - view_pose[0]) - view_pose[2]
-                az = az_gt + (np.random.randn(1, 1) * measurement_std)
-                v2t = np.array([vid, landmark_id[i], az_gt, az])
-
-                self.view_to_landmark_observations = np.vstack(self.view_to_landmark_observations, v2t)
-                is_valid[i] = True
-            else:
-                is_valid[i] = False
-
-        return is_valid
+        return True
 
     def add_view_to_view_observations(self, view_id1, view_id2, measurement_std):
         """
@@ -114,26 +87,9 @@ class Scenario:
         view_id - view ids [nx1]
         landmark_id - landmark ids [nx1]
         """
-        n = view_id.shape[0]
-        if (view_id.shape is not (n, 1)) or (landmark_id.shape is not (n, 1)):
-            Exception('invalid input!')
+        self.landmark_view_set.get_view_to_landmark_observations(view_ids1=view_id1, view_ids2=view_id2)
 
-        is_valid = np.array((n, 3), dtype=np.bool)
-        for i, vid in enumerate(view_id):
-            if vid in self.view_ids and landmark_id[i] in self.landmark_ids:
-                [view_pose, is_valid_i] = self.get_view(vid)
-                [landmark_position, is_valid_i] = self.get_landmark(landmark_id[i])
-
-                az_gt = np.arctan2(landmark_position[1] - view_pose[1], landmark_position[0] - view_pose[0]) - view_pose[2]
-                az = az_gt + (np.random.randn(1, 1) * measurement_std)
-                v2t = np.array([vid, landmark_id[i], az_gt, az])
-
-                self.view_to_landmark_observations = np.vstack(self.view_to_landmark_observations, v2t)
-                is_valid[i] = True
-            else:
-                is_valid[i] = False
-
-        return is_valid
+        return True
 
     def _generate_random_positions(self, num_landmarks):
         """
@@ -143,7 +99,7 @@ class Scenario:
         - self.rmin
         """
 
-        positions = np.zeros((num_landmarks, 3))
+        positions = np.zeros((num_landmarks, 2))
         i = 0
         while i < num_landmarks:
             # random positions
@@ -161,32 +117,100 @@ class Scenario:
 
         return positions
 
+    def _generate_random_pose(self, num_poses):
+        """
+        randomize poses keeping:
+        - self.xlim
+        - self.ylim
+        - self.rmin
+        """
+        poses = np.zeros((num_poses, 3))
+        positions = self._generate_random_positions(num_poses)
+        az = np.random.rand((num_poses, 1)) * np.pi * 2
+        poses[:, 1:] = positions
+        az[:, 2] = az
+
+        return poses
+
     def print(self):
         """
         print map data
         """
         pass
 
-    def plot_map_lims(self, color=None):
+    def plot_map_lims(self, axes, color=None):
         """
         plot map limits
         """
-        pass
+        # plot map limits
+        p1 = plt.plot([self.map_limits_x[0], self.map_limits_x[0], self.map_limits_x[1], self.map_limits_x[1], self.map_limits_x[0]],
+                 [self.map_limits_y[0], self.map_limits_y[1], self.map_limits_y[1], self.map_limits_y[0], self.map_limits_y[0]],
+                 axes=axes)
 
-    def plot_landmarks(self, color=None):
+        # plot landmarks
+        [is_valid, landmark_positions] = self.landmark_view_set.get_lanmark_positions()
+        p = plt.plot(landmark_positions[:, 0], landmark_positions[:, 1], 'ob', axes=axes)
+
+        return p
+
+    def plot_landmarks(self, axes, landmark_ids=None):
+        """
+        plot landmarks
+        axes - axes to plot in
+        landmark_ids - plot specific landmark ids
+                       None - plot all landmarks
+        """
+        [is_valid, landmark_positions] = self.landmark_view_set.get_lanmark_positions(landmark_ids)
+        p = plt.plot(landmark_positions[:, 0], landmark_positions[:, 1], 'ob', axes=axes)
+        return p
+
+    def plot_views(self, axes, view_ids=None, az_los_size=None):
+        """
+        plot views
+        axes - axes to plot in
+        view_ids - plot specific view ids
+                   None - plot all views
+        """
+        [is_valid, view_poses] = self.landmark_view_set.get_view_poses(view_ids)
+        # plot position
+        p1 = plt.plot(view_poses[:, 0], view_poses[:, 1], 'or', axes=axes)
+
+        # plot direction
+        # TODO: plot direction
+        dx = np.abs(self.map_limits_x[1] - self.map_limits_x[0])
+        dy = np.abs(self.map_limits_y[1] - self.map_limits_y[0])
+        if az_los_size is None:
+            sz = min(dx, dy) / 5
+        else:
+            sz = az_los_size
+        x = view_poses[0, :]
+        y = view_poses[1, :]
+        az = view_poses[2, :]
+        xx = x + sz * np.cos(az)
+        yy = y + sz * np.sin(az)
+        p2 = plt.plot([x, xx], [y, yy], '-r', axes=axes)  # TODO: is this correct?
+
+        # plot trajectory
+        p3 = plt.plot(x, y, '-r', axes=axes)  # TODO: is this correct?
+
+        p = p1.extend(p2).extend(p3)
+
+        return p
+
+    def plot_view_to_landmark_observations(self, axes, view_id=None, landmark_id=None, color=None):
         """
         plot landmarks
         """
-        pass
 
-    def plot_trajectory(self, color=None):
-        """
-        plot landmarks
-        """
-        pass
+        [is_valid, view_poses] = self.landmark_view_set.get_view_to_landmark_observations(view_id, landmark_id)
 
-    def plot_view_to_landmark_observations(self, color=None):
-        """
-        plot landmarks
-        """
-        pass
+        x = view_poses[:, 0]
+        y = view_poses[:, 1]
+
+        xx = view_poses[:, 0]
+        yy = view_poses[:, 1]
+
+        p = plt.plot([x, xx], [y, yy], '-r', axes=axes)  # TODO: is this correct?
+
+        return p
+

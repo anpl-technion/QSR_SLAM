@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+import time
 import numpy as np
 import simulation
 
@@ -80,13 +82,46 @@ def manual_scenario_test():
     return
 
 
-if __name__ == "__main__":
-    import plotly.express as px
+def plot_map_test(ax):
+    """
+    test add / get/ remove landmarks
+    """
+    xlims = [-7, 7]
+    ylims = [-5, 5]
+    plt.plot([xlims[0], xlims[0], xlims[1], xlims[1], xlims[0]], [ylims[0], ylims[1], ylims[1], ylims[0], ylims[0]],
+             axes=ax)
 
-    for i in range(0,5):
-        fig = px.line(x=["a", "b", "c"], y=[1, 3, 2], title="sample figure")
-        print(fig)
-    # fig.add_trace(px.scatter(x=[0, 1, 2, 3, 4], y=[0, 1, 4, 9, 16]))
-    # fig.add_scatter(x=[0, 1, 2, 3, 4], y=[0, 1, 4, 9, 16])
-        fig.show()
+    p1 = [[1, 2], [3, -2], [4, 1], [-3, -3], [2, 0]]
+    plt.plot([x[0] for x in p1], [x[1] for x in p1], 'ob', axes=ax)
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_title('scenario')  # subplot 211 title
+    plt.show(block=False)
+
+
+def plot_trajectory_test(ax, point):
+    """
+    test add / get/ remove landmarks
+    """
+    p = plt.plot(point[0], point[1], 'or', axes=ax)
+
+    return p
+
+
+if __name__ == "__main__":
+
+    fig, ax = plt.subplots()
+    plot_map_test(ax)
+
+    p2 = [[0, -4], [0, -2], [-2, 0], [-4, 2], [0, 3]]
+    plt2 = []
+    for i in range(0, len(p2)):
+        for pi in plt2:
+            pi.remove()
+        plt2 = plot_trajectory_test(ax, p2[i])
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+        time.sleep(1)
+
     manual_scenario_test()
